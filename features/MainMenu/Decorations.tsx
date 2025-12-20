@@ -317,18 +317,24 @@ const Decorations = ({
   );
   const { playClick } = useClick();
 
-  // Stable callback for explosion sound - no dependencies on changing state
-  const handleExplode = useCallback(() => {
-    playClick();
+  // Store latest playClick in ref to keep handleExplode stable
+  const playClickRef = useRef(playClick);
+  useEffect(() => {
+    playClickRef.current = playClick;
   }, [playClick]);
 
-  // Handle viewport resize with debounce
-  useEffect(() => {
-    let timeoutId: ReturnType<typeof setTimeout>;
+  // Stable callback for explosion sound - truly stable, no recreations
+  const handleExplode = useCallback(() => {
+    playClickRef.current();
+  }, []);
 
+  // Handle viewport resize with debounce
+  const resizeTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
+  useEffect(() => {
     const handleResize = () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
+      if (resizeTimeoutRef.current) clearTimeout(resizeTimeoutRef.current);
+      resizeTimeoutRef.current = setTimeout(() => {
         const newCount = calculateVisibleCount(interactive);
         if (newCount !== visibleCount) {
           setVisibleCount(newCount);
@@ -339,7 +345,7 @@ const Decorations = ({
     window.addEventListener('resize', handleResize);
     return () => {
       window.removeEventListener('resize', handleResize);
-      clearTimeout(timeoutId);
+      if (resizeTimeoutRef.current) clearTimeout(resizeTimeoutRef.current);
     };
   }, [interactive, visibleCount]);
 
@@ -358,12 +364,35 @@ const Decorations = ({
     };
   }, [visibleCount, forceShow]);
 
+  // Inject explosion keyframes once when interactive mode is enabled
+  useEffect(() => {
+    if (!interactive) return;
+
+    const styleId = 'decorations-explosion-keyframes';
+    // Only inject if not already present
+    if (document.getElementById(styleId)) return;
+
+    const styleElement = document.createElement('style');
+    styleElement.id = styleId;
+    styleElement.textContent = explosionKeyframes;
+    document.head.appendChild(styleElement);
+
+    return () => {
+      // Cleanup when component unmounts
+      const existingStyle = document.getElementById(styleId);
+      if (existingStyle) {
+        existingStyle.remove();
+      }
+    };
+  }, [interactive]);
+
   // Memoize grid content - now using separate components for interactive vs static
   const gridContent = useMemo(() => {
     if (styles.length === 0) return null;
 
     if (interactive) {
       // Interactive mode: each char manages its own animation state
+      // Note: Using index as key is acceptable here since styles array is stable after precomputation
       return styles.map((style, index) => (
         <InteractiveChar key={index} style={style} onExplode={handleExplode} />
       ));
@@ -379,7 +408,6 @@ const Decorations = ({
 
   return (
     <>
-      {interactive && <style>{explosionKeyframes}</style>}
       <div
         className={clsx(
           'fixed inset-0 overflow-hidden',
