@@ -214,10 +214,10 @@ const QuickSelectModal = ({
                     colorScheme={isSelected ? 'main' : 'secondary'}
                     borderColorScheme={isSelected ? 'main' : 'secondary'}
                     borderRadius='3xl'
-                    borderBottomThickness={isSelected ? 10 : 8}
+                    borderBottomThickness={10}
                     className={clsx(
                       'flex flex-col items-center gap-2 p-3 sm:p-4',
-                      isSelected ? 'order-first' : 'opacity-60'
+                      isSelected ? 'order-first' : 'opacity-40'
                     )}
                   >
                     {isSelected ? (
